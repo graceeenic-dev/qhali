@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mapa Interactivo — QHALI</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Aleo:wght@300;400;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --verde: #7BAE7F;
+      --beige: #F3E9DC;
+      --terracota: #C47448;
+      --cacao: #5E3E2E;
+      --azul: #3B7A78;
+      --hueso: #FAF8F4;
+      --shadow: 0 12px 30px rgba(94,62,46,0.12);
+      --radius: 1rem;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:'Aleo',serif;
+      background:linear-gradient(180deg,var(--beige),var(--hueso));
+      color:var(--cacao);
+    }
+
+    h1{text-align:center;padding:20px 0;margin:0;color:var(--cacao);}
+    .map-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+      gap:14px;
+      padding:20px;
+      max-width:1000px;
+      margin:auto;
+    }
+    .region{
+      background:var(--hueso);
+      border:1px solid rgba(94,62,46,0.1);
+      border-radius:var(--radius);
+      padding:12px;
+      text-align:center;
+      box-shadow:var(--shadow);
+      cursor:pointer;
+      transition:transform .2s ease, box-shadow .2s ease;
+    }
+    .region:hover{
+      transform:translateY(-6px);
+      box-shadow:0 12px 40px rgba(94,62,46,0.15);
+    }
+    .region strong{display:block;margin-bottom:6px;color:var(--terracota);}
+    .region small{color:#6b4e3f;font-size:0.8rem}
+
+    /* modal */
+    .modal{
+      position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+      background:rgba(0,0,0,0.4);z-index:100;
+    }
+    .modal.open{display:flex;}
+    .card{
+      background:var(--hueso);
+      border-radius:var(--radius);
+      padding:20px;
+      box-shadow:var(--shadow);
+      max-width:600px;width:90%;
+      animation:pop .25s ease;
+    }
+    @keyframes pop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+    .close{float:right;background:none;border:0;font-size:1.1rem;cursor:pointer;color:var(--cacao);}
+    .ritual,.fun{margin-top:10px;padding:10px;border-radius:8px;}
+    .ritual{background:rgba(196,116,72,0.06);}
+    .fun{background:rgba(59,122,120,0.06);}
+  </style>
+</head>
+<body>
+  <h1>Mapa Interactivo — Rituales y Fun Facts del Perú</h1>
+
+  <div class="map-grid" id="grid"></div>
+
+  <div class="modal" id="modal">
+    <div class="card">
+      <button class="close" id="closeBtn">✕</button>
+      <h2 id="deptTitle"></h2>
+      <small id="deptRegion"></small>
+      <div class="ritual" id="ritualText"></div>
+      <div class="fun" id="funFact"></div>
+    </div>
+  </div>
+
+  <script>
+    const departments = [
+      {id:'amazonas',name:'Amazonas',region:'Selva Alta',ritual:'Baño de hojas de cedrón y muña...',fun:'Amazonas tiene cañones y cataratas espectaculares.'},
+      {id:'ancash',name:'Áncash',region:'Sierra',ritual:'Cataplasma templado de arcilla...',fun:'Áncash alberga la Cordillera Blanca.'},
+      {id:'apurimac',name:'Apurímac',region:'Sierra',ritual:'Infusión de muña y manzanilla...',fun:'Importante en rutas incaicas.'},
+      {id:'arequipa',name:'Arequipa',region:'Sierra Sur',ritual:'Baño de vapor con eucalipto...',fun:'Ciudad blanca por su sillar volcánico.'},
+      {id:'ayacucho',name:'Ayacucho',region:'Sierra',ritual:'Masaje con aceite tibio de sacha inchi...',fun:'Rica tradición textil y rituales.'},
+      {id:'cajamarca',name:'Cajamarca',region:'Sierra Norte',ritual:'Compresa de agua salina templada...',fun:'Famosa por sus manantiales termales.'},
+      {id:'callao',name:'Callao',region:'Costa',ritual:'Masaje con aceite de oliva...',fun:'Principal puerto del Perú.'},
+      {id:'cusco',name:'Cusco',region:'Sierra Sur',ritual:'Infusión relajante andina...',fun:'Centro del imperio incaico.'},
+      {id:'huancavelica',name:'Huancavelica',region:'Sierra',ritual:'Frotación con aceite de cacao...',fun:'Región minera con saberes medicinales.'},
+      {id:'huanuco',name:'Huánuco',region:'Sierra/Amazonía',ritual:'Infusión templada de hierbas...',fun:'Puente entre selva y sierra.'},
+      {id:'ica',name:'Ica',region:'Costa',ritual:'Exfoliante con ceniza de cacao...',fun:'Viñedos y desiertos únicos.'},
+      {id:'junin',name:'Junín',region:'Sierra',ritual:'Baño de pies tibios...',fun:'Hogar de lagunas altoandinas.'},
+      {id:'lalibertad',name:'La Libertad',region:'Costa Norte',ritual:'Masaje con aceite de sacha inchi...',fun:'Cultura Moche y Chimú.'},
+      {id:'lambayeque',name:'Lambayeque',region:'Costa Norte',ritual:'Masaje con aceite templado...',fun:'El Señor de Sipán es su hallazgo más famoso.'},
+      {id:'lima',name:'Lima',region:'Costa Central',ritual:'Baño de vapor costeño...',fun:'Capital cultural y gastronómica.'},
+      {id:'loreto',name:'Loreto',region:'Selva',ritual:'Exfoliante amazónico...',fun:'Abarca gran parte de la Amazonía peruana.'},
+      {id:'madrededios',name:'Madre de Dios',region:'Selva',ritual:'Ritual de barro suave...',fun:'Gran biodiversidad tropical.'},
+      {id:'moquegua',name:'Moquegua',region:'Sur',ritual:'Compresa tibia con hierbas...',fun:'Historia vitivinícola.'},
+      {id:'pasco',name:'Pasco',region:'Sierra',ritual:'Masaje con aceites andinos...',fun:'Mesetas y tradiciones medicinales.'},
+      {id:'piura',name:'Piura',region:'Costa Norte',ritual:'Baño de agua templada con hojas...',fun:'Cuna de la cultura Tallán.'},
+      {id:'puno',name:'Puno',region:'Altiplano',ritual:'Infusión tibia con muña y coca...',fun:'Hogar del Lago Titicaca.'},
+      {id:'sanmartin',name:'San Martín',region:'Selva Alta',ritual:'Baño revitalizante con guayusa...',fun:'Puente entre sierra y selva.'},
+      {id:'tacna',name:'Tacna',region:'Sur',ritual:'Masaje con aceite de oliva...',fun:'Ciudad heroica del sur.'},
+      {id:'tumbes',name:'Tumbes',region:'Costa Norte',ritual:'Ritual de brisa marina...',fun:'Manglares y ecosistemas únicos.'},
+      {id:'ucayali',name:'Ucayali',region:'Selva',ritual:'Exfoliante con frutas locales...',fun:'Gran corredor fluvial de la selva.'}
+    ];
+
+    const grid=document.getElementById('grid');
+    const modal=document.getElementById('modal');
+    const deptTitle=document.getElementById('deptTitle');
+    const deptRegion=document.getElementById('deptRegion');
+    const ritualText=document.getElementById('ritualText');
+    const funFact=document.getElementById('funFact');
+    const closeBtn=document.getElementById('closeBtn');
+
+    departments.forEach(d=>{
+      const div=document.createElement('div');
+      div.className='region';
+      div.innerHTML=`<strong>${d.name}</strong><small>${d.region}</small>`;
+      div.addEventListener('click',()=>openModal(d));
+      grid.appendChild(div);
+    });
+
+    function openModal(d){
+      deptTitle.textContent=d.name;
+      deptRegion.textContent=d.region;
+      ritualText.innerHTML=`<strong>Ritual:</strong> ${d.ritual}`;
+      funFact.innerHTML=`<strong>Fun fact:</strong> ${d.fun}`;
+      modal.classList.add('open');
+    }
+    closeBtn.addEventListener('click',()=>modal.classList.remove('open'));
+    modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('open')});
+  </script>
+</body>
+</html>
